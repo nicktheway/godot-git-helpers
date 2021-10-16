@@ -77,10 +77,13 @@ function validate_playing() {
 
 function validate_file_frame_changes() {
 	local filepath="$1"
-	local framelines="$(git diff -U$(wc -l "$filepath") | grep -n '^[+-]frame' | cut -d':' -f1)"
+	local framelines="$(git diff -U$(wc -l "$filepath") | grep -n '^+frame' | cut -d':' -f1)"
 	for line in $(echo "$framelines"); do
 		log '  > Verifying frame change on line' $line # for file $filepath
 		validate_node_type "$filepath" "$line"
+		if [ $? -ne 0 ]; then
+			return 1
+		fi
 		validate_playing "$filepath" "$line"
 		if [ $? -ne 0 ]; then
 			return 1
