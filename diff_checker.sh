@@ -33,7 +33,6 @@ function validate_node_type() {
 	local filepath="$1"
 	local line="$2"
 
-	log '  > Verifying frame change on line' $line # for file $filepath
 	local stop=1
 	local previousline=$((line-1))
 	while [ $stop -eq 1 ]; do
@@ -49,6 +48,30 @@ function validate_node_type() {
 
 		previousline=$((previousline-1))
 	done
+	log '    X Not an AnimatedSprite node!'
+	return 1
+}
+
+function validate_playing() {
+	local filepath="$1"
+	local line="$2"
+
+	local stop=1
+	local nextline=$((line+1))
+	while [ $stop -eq 1 ]; do
+		local linetext=$(git diff -U$(wc -l "$filepath") | sed "${nextline}q;d") 
+		echo "$linetext" | grep "^ *$" > /dev/null
+		stop=$?
+		
+		echo "$linetext" | grep "playing = true" > /dev/null
+		if [ $? = 0 ]; then
+			log '    O Confirmed that the animation is running: ' "$linetext"
+			return 0
+		fi
+
+		nextline=$((nextline+1))
+	done
+	log '    X The animation is not running!'
 	return 1
 }
 
@@ -56,7 +79,9 @@ function validate_file_frame_changes() {
 	local filepath="$1"
 	local framelines="$(git diff -U$(wc -l "$filepath") | grep -n '^[+-]frame' | cut -d':' -f1)"
 	for line in $(echo "$framelines"); do
+		log '  > Verifying frame change on line' $line # for file $filepath
 		validate_node_type "$filepath" "$line"
+		validate_playing "$filepath" "$line"
 		if [ $? -ne 0 ]; then
 			return 1
 		fi
@@ -64,13 +89,13 @@ function validate_file_frame_changes() {
 	return 0
 }
 
-function validate_revertable_changes() {
+function validate_and_revert_changes() {
 	for filepath in "$@"; do
 		log ""
 		log "- Validating: " "$filepath"
 		validate_file_frame_changes "$filepath"
 		if [ $? -ne 0 ]; then
-			log 'The script will not revert this file as it looks like it contains important changes!'
+			log '  The script will not revert this file as it looks like it contains intended changes!'
 			continue
 		fi
 
@@ -101,5 +126,7 @@ if [ -n "$ONLY_FRAME_CHANGED_FILES" ]; then
 	log 'Identified files with only frame changes: '
 	log ''
 	for file in ${ONLY_FRAME_CHANGED_FILES[@]}; do log "$file"; done;
-	validate_revertable_changes "${ONLY_FRAME_CHANGED_FILES[@]}"
+	validate_and_revert_changes "${ONLY_FRAME_CHANGED_FILES[@]}"
+else
+	log 'No files with only frame changes found.'
 fi
