@@ -110,6 +110,9 @@ function validate_and_revert_changes() {
 	return 0
 }
 
+SCRIPT_DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
+cd "$SCRIPT_DIR"
+
 CHANGED_FILES="$(git diff --name-only | fmt -w1)"
 CHANGED_SCENES=$(echo "$CHANGED_FILES" | grep \.tscn$)
 ONLY_FRAME_CHANGED_FILES=()
